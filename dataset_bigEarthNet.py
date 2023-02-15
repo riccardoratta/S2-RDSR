@@ -56,8 +56,6 @@ def merge_bigEarthNet_patch(path: str, patch: str, bands: Bands) -> torch.Tensor
 if __name__ == "__main__":
     args = parser.parse_args()
 
-    print(args)
-
     if not os.path.exists(args.path) or not os.path.isdir(args.path):
         print(f"Input path {args.path} doens't exists.")
         exit(-1)
