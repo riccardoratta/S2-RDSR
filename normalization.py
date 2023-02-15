@@ -19,7 +19,11 @@ parser = argparse.ArgumentParser(
     description="Compute the standard devation and mean of a SR dataset."
 )
 
-parser.add_argument("path", metavar="P", help="Path to a SR dataset")
+parser.add_argument(
+    "path",
+    metavar="P",
+    help="Path to a SR dataset",
+)
 
 parser.add_argument(
     "--type",
@@ -30,7 +34,10 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--batch-size", type=int, default=100, help="Specify batch size for the data loader"
+    "--batch-size",
+    type=int,
+    default=100,
+    help="Specify batch size for the data loader",
 )
 
 parser.add_argument(
