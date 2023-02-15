@@ -9,6 +9,7 @@ from helpers.sentinel import Bands
 
 from typing import List, Dict, Callable
 
+from helpers.log import error
 from helpers.sentinel import Bands, Resolution
 from helpers.dataset.SR20 import SR20
 
@@ -93,8 +94,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if not os.path.exists(args.path) or not os.path.isdir(args.path):
-        print(f"Input path {args.path} doens't exists.")
-        exit(-1)
+        error(f"Input path {args.path} is not valid.")
 
     if args.num_workers != 2:
         print(f"Numer of workers for data loading: {args.num_workers}")
