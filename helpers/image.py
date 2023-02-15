@@ -3,6 +3,11 @@ import torch.nn as nn
 import torchvision.transforms as T
 import torchvision.transforms.functional as F
 
+import matplotlib.pyplot as plt
+import matplotlib_inline
+
+from typing import List
+
 from PIL import Image as PIL_image
 
 class Image:
@@ -22,3 +27,17 @@ def downscale(scale: int):
     return T.Compose([
         T.GaussianBlur(kernel_size, sigma), nn.AvgPool2d(kernel_size=2),
     ])
+
+def _plot_row(patch, bands, axs):
+    for i, band in enumerate(bands):
+        axs[i].imshow(patch[i, :, :], cmap='Greys')
+        axs[i].set_title(f'Band {band}')
+        axs[i].axis('off')
+
+def plot_patch(patch: torch.Tensor, bands: List[str]):
+    '''
+    Plot a S2 patch with all of its bands.
+    '''
+    matplotlib_inline.backend_inline.set_matplotlib_formats('svg')
+    
+    _plot_row(patch, bands, plt.subplots(1, len(bands))[1])
