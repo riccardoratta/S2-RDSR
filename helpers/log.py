@@ -1,0 +1,2 @@
+def error(message):
+    pass
