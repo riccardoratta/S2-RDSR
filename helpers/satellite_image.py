@@ -12,13 +12,17 @@ from PIL import Image as PIL_image
 
 
 class SatelliteImage:
-    def __init__(self, path: str, max_v=20000):
+    def __init__(self, path: str, v_max=20000):
         self.image = PIL_image.open(path)
-        self.max_v = max_v
+        self.max_v = v_max
 
     @property
     def tensor(self) -> torch.Tensor:
         return torch.clamp(F.to_tensor(self.image), 0, self.max_v) / self.max_v
+
+
+def denormalize(value: torch.Tensor, v_max=20000):
+    return (value * v_max).type(torch.int16)
 
 
 def downscale(scale: int):
