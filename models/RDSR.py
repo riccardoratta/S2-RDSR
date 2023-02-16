@@ -41,21 +41,29 @@ class _RRD(nn.Module):
         return x3 + x0
 
 
-class RDSR(nn.Sequential):
+class _RD(nn.Sequential):
     def __init__(
         self,
-        in_channels: int = 10,
-        out_channels: int = 6,
+        in_channels: int,
+        out_channels: int,
+        middle_channels: int = 128,
         scaler: float = 0.2,
         rrd_n: int = 3,
     ):
-        super(RDSR, self).__init__(
-            nn.Conv2d(in_channels, 128, kernel_size=3, padding=1),
+        super(_RD, self).__init__(
+            nn.Conv2d(in_channels, middle_channels, kernel_size=3, padding=1),
             *[_RRD(scaler) for _ in range(rrd_n)],
-            nn.Conv2d(126, out_channels, kernel_size=3, padding=1)
+            nn.Conv2d(middle_channels, out_channels, kernel_size=3, padding=1),
         )
+
+
+class RDSR(nn.Sequential):
+    def __init__(self):
+        super(RDSR, self).__init__()
+
+        self.RD = _RD(in_channels=10, out_channels=6, rrd_n=3)
 
     def forward(self, x1: torch.Tensor, x2: torch.Tensor):
         x2 = T.Resize(x1.size(dim=2), interpolation=T.InterpolationMode.BICUBIC)(x2)
 
-        return self(torch.cat((x1, x2), dim=1)) + x2
+        return self.RD(torch.cat((x1, x2), dim=1)) + x2
