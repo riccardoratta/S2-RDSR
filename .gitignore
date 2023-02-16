@@ -170,6 +170,7 @@ cython_debug/
 
 # Temporary
 examples/temp.ipynb
+examples/patch
 
 # Out files
 model.pt
