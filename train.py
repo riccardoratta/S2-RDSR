@@ -11,12 +11,10 @@ from torch.utils.data import DataLoader, random_split
 
 import torchvision.transforms as T
 
-import torchmetrics
-
 from models.RDSR import RDSR
 
 from helpers.log import error
-from helpers.model import at_epoch
+from helpers.model import at_epoch, Logger
 from helpers.dataset.SR20 import SR20
 
 parser = argparse.ArgumentParser(
@@ -50,19 +48,29 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    "--model-out",
+    type=str,
+    default="model.out.pt",
+    help="Path to the trained model, updated every epoch",
+)
+
+parser.add_argument(
     "--num-workers",
     type=int,
-    default=0,
+    default=2,
     help="How many subprocesses to use for data loading",
 )
 
+parser.add_argument(
+    "--tensorboard",
+    type=bool,
+    default=True,
+    help="If to use TensorBoard to monitor training",
+)
 
-def _get_optimizer(model: torch.nn.Module, learning_rate):
-    return optim.Adam(model.parameters(), lr=learning_rate)
 
-
-def _get_scheduler(optimizer: optim.Optimizer, learning_rate):
-    return optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=learning_rate)
+def _rmse_fn(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+    return torch.sqrt(nn.functional.mse_loss(x, y))
 
 
 if __name__ == "__main__":
@@ -73,10 +81,8 @@ if __name__ == "__main__":
     if not p.isdir(args.path):
         error(f"Input path {args.path} is not valid.")
 
-    if args.model is not None:
-        if not p.isfile(args.model):
-            error(f"Model path {args.path} is not valid.")
-        # TODO: implement model retrival
+    if args.model == args.model_out:
+        error("Input model must be different from output model")
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -108,40 +114,70 @@ if __name__ == "__main__":
 
     learning_rate = 0.0002
 
-    model = RDSR().to(device)
+    state = {
+        "model": RDSR().to(device),
+    }
 
-    optimizer = _get_optimizer(model, learning_rate)
-    scheduler = _get_scheduler(optimizer, learning_rate)
+    state = {
+        **state,
+        "epoch": 0,
+        "optimizer": optim.Adam(
+            state["model"].parameters(),
+            lr=learning_rate,
+        ),
+        "scaler": torch.cuda.amp.GradScaler(),  # type: ignore
+    }
 
-    print("Training epoch n. 001..")
+    if args.model is not None:
+        if not p.isfile(args.model):
+            error(f"Model path {args.model} is not valid.")
+
+        loader = torch.load(args.model, map_location=device)
+
+        for k in loader:
+            if hasattr(state[k], "load_state_dict"):
+                state[k].load_state_dict(loader[k])
+            else:
+                state[k] = loader[k]
+
+        print("State loader")
+
+    print(f"Training epoch n. {state['epoch']+1:03d}..")
+
+    logger = None
+
+    if args.tensorboard:
+        logger = Logger("RDSR")
 
     for epoch, (step_v, eval_v) in at_epoch(
-        model,
-        args.epochs,
+        state["model"],
+        [state["epoch"], state["epoch"] + args.epochs],
         dataLoader,
         eval_dataLoader,
         nn.L1Loss(),
-        torchmetrics.MeanSquaredError(),
-        optimizer,
-        scheduler,
-        # gradient_clipping=1,
-        inverse_norm=dataset.inverse_20m_norm,
+        _rmse_fn,
+        state["optimizer"],
+        state["scaler"],
+        gradient_clipping=1,
     ):
         print(f"Epoch {epoch:03d}/{args.epochs:03d} completed.")
 
         print(f"> {step_v:.3f}, {eval_v:.3f}")
 
+        if logger is not None:
+            logger.add(epoch, step_v, eval_v)
+
+        state["epoch"] = epoch
+
+        torch.save(
+            {
+                k: (value.state_dict() if hasattr(value, "state_dict") else value)
+                for k, value in state.items()
+            },
+            args.model_out,
+        )
+
         if epoch != args.epochs:
             print(f"Training epoch n. {epoch+1:03d}..")
 
     print(f"Training completed in {time() - start:.2f}s!")
-
-    torch.save(
-        {
-            "model": model.state_dict(),
-            "epochs": args.epochs,
-            "optimizer": optimizer.state_dict(),
-            "scheduler": scheduler.state_dict(),
-        },
-        "model.pt",
-    )
