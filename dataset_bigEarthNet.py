@@ -5,7 +5,7 @@ import shutil
 
 import torch
 
-from helpers.image import Image, downscale
+from helpers.satellite_image import SatelliteImage, downscale
 from helpers.sentinel import Bands
 
 parser = argparse.ArgumentParser(
@@ -46,7 +46,7 @@ def merge_bigEarthNet_patch(path: str, patch: str, bands: Bands) -> torch.Tensor
     """
     return torch.cat(
         [
-            Image(p.join(path, f"{patch}_B{band}.tif")).tensor.float()
+            SatelliteImage(p.join(path, f"{patch}_B{band}.tif")).tensor.float()
             for band in bands.value
         ],
         0,

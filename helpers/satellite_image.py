@@ -11,13 +11,16 @@ from typing import List
 from PIL import Image as PIL_image
 
 
-class Image:
-    def __init__(self, path: str):
+class SatelliteImage:
+    def __init__(self, path: str, max_v=20000):
         self.image = PIL_image.open(path)
+        self.max_v = max_v
 
     @property
     def tensor(self) -> torch.Tensor:
-        return F.to_tensor(self.image)
+        return (torch.clamp(F.to_tensor(self.image), 0, self.max_v) / self.max_v).type(
+            torch.float16
+        )
 
 
 def downscale(scale: int):
