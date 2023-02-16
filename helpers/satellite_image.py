@@ -21,8 +21,8 @@ class SatelliteImage:
         return torch.clamp(F.to_tensor(self.image), 0, self.max_v) / self.max_v
 
 
-def denormalize(value: torch.Tensor, v_max=20000):
-    return (value * v_max).type(torch.int16)
+def denormalize(value: torch.Tensor, dtype=torch.int16, v_max=20000):
+    return (value * v_max).type(dtype)
 
 
 def downscale(scale: int):

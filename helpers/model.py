@@ -11,6 +11,7 @@ import torchvision.transforms as T
 
 from torchmetrics.metric import Metric
 
+from helpers.satellite_image import denormalize
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -30,17 +31,13 @@ def _mean(values: List[float]):
     return torch.mean(torch.tensor(values), dtype=torch.float).item()
 
 
-# TODO: scaler must be saved alognside the model
-scaler = torch.cuda.amp.GradScaler()  # type: ignore
-
-
 def model_step(
     model: nn.Module,
     dataLoader: DataLoader,
     loss_fn: Callable,
     optimizer: Optimizer,
-    scheduler=None,
-    gradient_clipping=None,
+    scaler,
+    gradient_clipping: float,
 ):
     model.train()
 
@@ -57,9 +54,9 @@ def model_step(
 
         scaler.scale(loss).backward()  #  type: ignore
 
-        if gradient_clipping:
-            scaler.unscale_(optimizer)
-            nn.utils.clip_grad_norm_(model.parameters(), gradient_clipping)  # type: ignore
+        scaler.unscale_(optimizer)
+
+        nn.utils.clip_grad_norm_(model.parameters(), gradient_clipping)  # type: ignore
 
         scaler.step(optimizer)
         scaler.update()
@@ -70,9 +67,6 @@ def model_step(
 
         s_loss += loss.detach()
 
-    if scheduler:
-        scheduler.step()
-
     print("\r", end="", flush=True)
 
     return s_loss.item() / n
@@ -82,7 +76,6 @@ def model_eval(
     model: nn.Module,
     dataLoader: DataLoader,
     eval_fns: Union[Callable, List[Callable]],
-    inverse_norm: Union[T.Normalize, None] = None,
 ):
     model.eval()
 
@@ -93,7 +86,11 @@ def model_eval(
         if isinstance(eval_fn, Metric):
             eval_fns[i] = eval_fn.to(device)
 
-    stats: List[List[float]] = [[] for _ in eval_fns]
+    n = 0
+
+    stats: List[torch.Tensor] = [
+        torch.tensor(0, dtype=torch.float, device=device) for _ in eval_fns
+    ]
 
     with torch.no_grad():
         for (x1, x2), targets in _cuda(dataLoader):
@@ -102,22 +99,16 @@ def model_eval(
                 outputs = model(x1, x2)
 
             for i, eval_fn in enumerate(eval_fns):
-                # TODO: https://pytorch.org/tutorials/recipes/recipes/tuning_guide.html#avoid-unnecessary-cpu-gpu-synchronization
-                stats[i].append(
-                    (
-                        eval_fn(
-                            inverse_norm(outputs),
-                            inverse_norm(targets),
-                        ).item()
-                        if inverse_norm is not None
-                        else eval_fn(
-                            outputs,
-                            targets,
-                        ).item()
-                    )
+                stats[i] += eval_fn(
+                    denormalize(outputs, dtype=torch.float),
+                    denormalize(targets, dtype=torch.float),
                 )
 
-    return [_mean(stat) for stat in stats] if len(stats) != 1 else _mean(stats[0])
+            n += 1
+
+    if len(stats) == 1:
+        return (stats[0] / n).item()
+    return [(stat / n).item() for stat in stats]
 
 
 def at_epoch(
@@ -128,9 +119,8 @@ def at_epoch(
     loss_fn: Callable,
     eval_fn: Union[Callable, List[Callable]],
     optimizer: Optimizer,
-    scheduler=None,
-    gradient_clipping=None,
-    inverse_norm: Union[T.Normalize, None] = None,
+    scaler,
+    gradient_clipping: float,
 ):
     """
     Train a model. Epochs could be the number of epochs to train, or a tuple with `start` and `end`
@@ -151,7 +141,7 @@ def at_epoch(
             dataLoader,
             loss_fn,
             optimizer,
-            scheduler,
+            scaler,
             gradient_clipping,
         )
 
@@ -159,7 +149,6 @@ def at_epoch(
             model,
             eval_dataLoader,
             eval_fn,
-            inverse_norm,
         )
 
         yield epoch + 1, (step_v, eval_v)
