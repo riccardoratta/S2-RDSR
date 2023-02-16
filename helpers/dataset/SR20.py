@@ -1,6 +1,7 @@
 import os
 import os.path as p
 import glob
+import json
 
 import torch
 
@@ -10,20 +11,37 @@ from typing import Union, List
 
 from torch.utils.data import Dataset
 
+from helpers.sentinel import Resolution
+
 
 class SR20(Dataset):
     def __init__(
         self,
         path: str,
-        transforms: Union[List[torch.nn.Module], None] = None,
         limit: Union[int, None] = None,
+        dtype=torch.float16,
     ):
         self.path = p.join(path, "SR20")
-        self.transforms = transforms
+
+        if limit:
+            print("Warning: a dataset limit has been set")
+
         self.limit = limit
 
-        if self.limit:
-            print("Warning, a dataset limit has been set.")
+        self.dtype = dtype
+
+        self.transforms = None
+
+        try:
+            with open(p.join(self.path, "norm.json")) as file:
+                norm = json.load(file)
+                self.transforms = [
+                    T.Normalize(mean=norm["mean"]["10"], std=norm["std"]["10"]),
+                    T.Normalize(mean=norm["mean"]["20"], std=norm["std"]["20"]),
+                    T.Normalize(mean=norm["mean"]["20"], std=norm["std"]["20"]),
+                ]
+        except FileNotFoundError:
+            print("Warning: 'norm.json' is missing from the dataset")
 
     def __len__(self):
         l = len(glob.glob(p.join(self.path, "20", "*.pt")))
@@ -42,6 +60,13 @@ class SR20(Dataset):
             torch.load(p.join(self.path, "20", "eval", f"{idx}.pt")),
         )
 
+        if self.dtype != torch.float:
+            p1, p2, p1_eval = (
+                p1.to(self.dtype),
+                p2.to(self.dtype),
+                p1_eval.to(self.dtype),
+            )
+
         if self.transforms:
             p1, p2, p1_eval = (
                 self.transforms[0](p1),
@@ -50,6 +75,24 @@ class SR20(Dataset):
             )
 
         return (p1, p2), p1_eval
+
+    @property
+    def inverse_10m_norm(self):
+        if self.transforms is not None:
+            return _get_inverse_norm(self.transforms[0])
+        return None
+
+    @property
+    def inverse_20m_norm(self):
+        if self.transforms is not None:
+            return _get_inverse_norm(self.transforms[1])
+        return None
+
+
+def _get_inverse_norm(v):
+    return T.Normalize(
+        mean=-(torch.tensor(v.mean) / torch.tensor(v.std)), std=1 / torch.tensor(v.std)
+    )
 
 
 """
