@@ -175,3 +175,6 @@ examples/patch
 # Out files
 model.pt
 nohup.out
+
+# TensorBoard
+runs/
