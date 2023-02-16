@@ -100,7 +100,7 @@ def dataset_std_mean(dataLoader: DataLoader, resolutions: List[str]):
 if __name__ == "__main__":
     args = parser.parse_args()
 
-    if not os.path.exists(args.path) or not os.path.isdir(args.path):
+    if not p.isdir(args.path):
         error(f"Input path {args.path} is not valid.")
 
     if args.num_workers != 2:
