@@ -226,13 +226,6 @@ if __name__ == "__main__":
             size * extent // 6,
         )
 
-        """
-        print(f"SR60 patch sizes:")
-        print(f"> 10m: {size_10m} px")
-        print(f"> 20m: {size_20m} px")
-        print(f"> 60m: {size_60m} px")
-        """
-
         downscale6x = downscale(6)
 
         for i, patch_set in enumerate(patches):
@@ -245,6 +238,7 @@ if __name__ == "__main__":
 
             for j, patch_dir in enumerate(sorted(patch_set)):
 
+                # subpatch coordinates
                 x, y = j % extent, j // extent
 
                 # extract 10m, 20m and 60m bands from a patch directory
