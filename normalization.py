@@ -30,21 +30,21 @@ parser.add_argument(
     choices=["20", "60"],
     nargs="+",
     required=True,
-    help='Specify the dataset type, could be "20" or "60" respectively for SR 20m or 60m dataset',
+    help='Dataset type, could be "20" or "60" respectively for SR 20m or 60m dataset',
 )
 
 parser.add_argument(
     "--batch-size",
     type=int,
     default=100,
-    help="Specify batch size for the data loader",
+    help="Batch size for the data loader",
 )
 
 parser.add_argument(
     "--num-workers",
     type=int,
     default=0,
-    help="Specify how many subprocesses to use for data loading.",
+    help="How many subprocesses to use for data loading",
 )
 
 
@@ -72,7 +72,7 @@ def dataset_std_mean(dataLoader: DataLoader, resolutions: List[str]):
     n_max = len(dataLoader)
     limit = 0
     for value, _ in dataLoader:
-        print(f"\r{n / n_max * 100:.2f}%", end="", flush=True)
+        print(f"> \r{n / n_max * 100:.2f}%", end="", flush=True)
 
         for i, r in enumerate(resolutions):
             std[r] += batch_band(value[i], torch.std)
