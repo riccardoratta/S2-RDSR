@@ -18,9 +18,7 @@ class SatelliteImage:
 
     @property
     def tensor(self) -> torch.Tensor:
-        return (torch.clamp(F.to_tensor(self.image), 0, self.max_v) / self.max_v).type(
-            torch.float16
-        )
+        return torch.clamp(F.to_tensor(self.image), 0, self.max_v) / self.max_v
 
 
 def downscale(scale: int):
