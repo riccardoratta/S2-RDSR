@@ -163,5 +163,5 @@ class Logger(SummaryWriter):
         super().__init__(f"runs/{name}")
 
     def add(self, epoch, step_v, eval_v):
-        self.add_scalar("training/loss", step_v, epoch)
-        self.add_scalar("validation/loss", eval_v, epoch)
+        self.add_scalar("Loss/training", step_v, epoch)
+        self.add_scalar("Loss/validation", eval_v, epoch)
