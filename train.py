@@ -11,11 +11,12 @@ from torch.utils.data import DataLoader, random_split
 
 import torchvision.transforms as T
 
-from models.RDSR import RDSR
+from models.RDSR import RDSR_20, RDSR_60
 
 from helpers.log import error
 from helpers.model import at_epoch, Logger
 from helpers.dataset.SR20 import SR20
+from helpers.dataset.SR60 import SR60
 
 parser = argparse.ArgumentParser(
     description="Train a RDSR deep neural network",
@@ -25,6 +26,13 @@ parser.add_argument(
     "path",
     metavar="P",
     help="Path to a SR dataset",
+)
+parser.add_argument(
+    "--type",
+    choices=["20", "60"],
+    type=str,
+    required=True,
+    help='Dataset type, could be "20" or "60" respectively for SR 20m or 60m dataset',
 )
 
 parser.add_argument(
@@ -41,6 +49,7 @@ parser.add_argument(
     help="Batch size for the training",
 )
 
+"""
 parser.add_argument(
     "--model",
     type=str,
@@ -53,6 +62,7 @@ parser.add_argument(
     default="model.out.pt",
     help="Path to the trained model, updated every epoch",
 )
+"""
 
 parser.add_argument(
     "--num-workers",
@@ -81,8 +91,10 @@ if __name__ == "__main__":
     if not p.isdir(args.path):
         error(f"Input path {args.path} is not valid.")
 
+    """
     if args.model == args.model_out:
-        error("Input model must be different from output model")
+        print("Warning: input model will be overwritten")
+    """
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -92,7 +104,9 @@ if __name__ == "__main__":
     if args.num_workers != 2:
         print(f"Numer of workers for data loading: {args.num_workers}")
 
-    dataset = SR20(args.path)
+    limit = 1000
+
+    dataset = SR20(args.path, limit) if args.type == "20" else SR60(args.path, limit)
 
     sub_dataset, eval_sub_dataset = random_split(dataset, [0.9, 0.1])
 
@@ -112,10 +126,16 @@ if __name__ == "__main__":
         ),
     )
 
+    args.model = f"model.{args.type}.pt"
+    args.model_out = f"model.{args.type}.pt"
+
+    if p.isfile(args.model_out):
+        print("Warning: output model will be overwritten")
+
     learning_rate = 0.0002
 
     state = {
-        "model": RDSR().to(device),
+        "model": RDSR_20().to(device) if args.type == "20" else RDSR_60().to(device),
     }
 
     state = {
@@ -128,9 +148,7 @@ if __name__ == "__main__":
         "scaler": torch.cuda.amp.GradScaler(),  # type: ignore
     }
 
-    if args.model is not None:
-        if not p.isfile(args.model):
-            error(f"Model path {args.model} is not valid.")
+    if p.isfile(args.model):
 
         loader = torch.load(args.model, map_location=device)
 
@@ -140,18 +158,20 @@ if __name__ == "__main__":
             else:
                 state[k] = loader[k]
 
-        print("State loader")
+        print(f"State loaded from: '{args.model}'")
 
     print(f"Training epoch n. {state['epoch']+1:03d}..")
 
     logger = None
 
     if args.tensorboard:
-        logger = Logger("RDSR")
+        logger = Logger(f"RDSR/{args.type}")
+
+    start_epochs, end_epochs = state["epoch"], state["epoch"] + args.epochs
 
     for epoch, (step_v, eval_v) in at_epoch(
         state["model"],
-        [state["epoch"], state["epoch"] + args.epochs],
+        [start_epochs, end_epochs],
         dataLoader,
         eval_dataLoader,
         nn.L1Loss(),
@@ -166,6 +186,7 @@ if __name__ == "__main__":
 
         if logger is not None:
             logger.add(epoch, step_v, eval_v)
+            logger.flush()
 
         state["epoch"] = epoch
 
@@ -177,7 +198,10 @@ if __name__ == "__main__":
             args.model_out,
         )
 
-        if epoch != args.epochs:
+        if epoch != end_epochs:
             print(f"Training epoch n. {epoch+1:03d}..")
+
+    if logger is not None:
+        logger.close()
 
     print(f"Training completed in {time() - start:.2f}s!")

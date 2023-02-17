@@ -23,7 +23,7 @@ parser.add_argument(
     choices=["20", "60"],
     nargs="+",
     required=True,
-    help='Dataset type, could be "20" or "60" respectively for SR 20m or 60m dataset',
+    help='Dataset type, could be "20" or (and) "60" respectively for SR 20m or 60m dataset',
 )
 
 parser.add_argument(

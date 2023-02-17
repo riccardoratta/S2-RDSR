@@ -8,13 +8,13 @@ from typing import Union
 from torch.utils.data import Dataset
 
 
-class SR20(Dataset):
+class SR60(Dataset):
     def __init__(
         self,
         path: str,
         limit: Union[int, None] = None,
     ):
-        self.path = p.join(path, "SR20")
+        self.path = p.join(path, "SR60")
 
         if limit:
             print("Warning: a dataset limit has been set")
@@ -22,7 +22,7 @@ class SR20(Dataset):
         self.limit = limit
 
     def __len__(self):
-        l = len(glob.glob(p.join(self.path, "20", "*.pt")))
+        l = len(glob.glob(p.join(self.path, "060", "*.pt")))
 
         if self.limit is not None:
             return min(l, self.limit)
@@ -32,10 +32,11 @@ class SR20(Dataset):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
-        p1, p2, p1_eval = (
-            torch.load(p.join(self.path, "20", f"{idx}.pt")),
-            torch.load(p.join(self.path, "40", f"{idx}.pt")),
-            torch.load(p.join(self.path, "20", "eval", f"{idx}.pt")),
+        p1, p2, p3, p1_eval = (
+            torch.load(p.join(self.path, "060", f"{idx}.pt")),
+            torch.load(p.join(self.path, "120", f"{idx}.pt")),
+            torch.load(p.join(self.path, "360", f"{idx}.pt")),
+            torch.load(p.join(self.path, "060", "eval", f"{idx}.pt")),
         )
 
-        return (p1, p2), p1_eval
+        return (p1, p2, p3), p1_eval

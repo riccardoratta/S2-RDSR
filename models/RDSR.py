@@ -57,9 +57,9 @@ class _RD(nn.Sequential):
         )
 
 
-class RDSR(nn.Sequential):
+class RDSR_20(nn.Sequential):
     def __init__(self):
-        super(RDSR, self).__init__()
+        super(RDSR_20, self).__init__()
 
         self.RD = _RD(in_channels=10, out_channels=6, rrd_n=3)
 
@@ -67,3 +67,16 @@ class RDSR(nn.Sequential):
         x2 = T.Resize(x1.size(dim=2), interpolation=T.InterpolationMode.BICUBIC)(x2)
 
         return self.RD(torch.cat((x1, x2), dim=1)) + x2
+
+
+class RDSR_60(nn.Sequential):
+    def __init__(self):
+        super(RDSR_60, self).__init__()
+
+        self.RD = _RD(in_channels=12, out_channels=2, rrd_n=3)
+
+    def forward(self, x1: torch.Tensor, x2: torch.Tensor, x3: torch.Tensor):
+        x2 = T.Resize(x1.size(dim=2), interpolation=T.InterpolationMode.BICUBIC)(x2)
+        x3 = T.Resize(x1.size(dim=2), interpolation=T.InterpolationMode.BICUBIC)(x3)
+
+        return self.RD(torch.cat((x1, x2, x3), dim=1)) + x3
