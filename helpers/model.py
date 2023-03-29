@@ -11,16 +11,14 @@ import torchvision.transforms as T
 
 from torchmetrics.metric import Metric
 
-from helpers.satellite_image import denormalize
-
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 def _cuda(dataLoader):
     for batch in dataLoader:
         # inputs
-        batch[0][0] = batch[0][0].to(device)
-        batch[0][1] = batch[0][1].to(device)
+        for i in range(len(batch[0])):
+            batch[0][i] = batch[0][i].to(device)
         # target
         batch[1] = batch[1].to(device)
 
@@ -38,6 +36,7 @@ def model_step(
     optimizer: Optimizer,
     scaler,
     gradient_clipping: float,
+    scheduler,
 ):
     model.train()
 
@@ -46,11 +45,11 @@ def model_step(
 
     s_loss = torch.tensor(0, dtype=torch.float, device=device)
 
-    for (x1, x2), targets in _cuda(dataLoader):
+    for inputs, targets in _cuda(dataLoader):
         print(f"\r> {n / n_max * 100:.2f}%", end="", flush=True)
 
         with torch.autocast(device_type=device, dtype=torch.float16):  # type: ignore
-            loss = loss_fn(model(x1, x2), targets)
+            loss = loss_fn(model(*inputs), targets)
 
         scaler.scale(loss).backward()  #  type: ignore
 
@@ -67,6 +66,9 @@ def model_step(
 
         s_loss += loss.detach()
 
+    if scheduler is not None:
+        scheduler.step()
+
     print("\r", end="", flush=True)
 
     return s_loss.item() / n
@@ -76,6 +78,7 @@ def model_eval(
     model: nn.Module,
     dataLoader: DataLoader,
     eval_fns: Union[Callable, List[Callable]],
+    denormalize,
 ):
     model.eval()
 
@@ -93,15 +96,15 @@ def model_eval(
     ]
 
     with torch.no_grad():
-        for (x1, x2), targets in _cuda(dataLoader):
+        for inputs, targets in _cuda(dataLoader):
 
             with torch.autocast(device_type=device, dtype=torch.float16):  # type: ignore
-                outputs = model(x1, x2)
+                outputs = model(*inputs)
 
             for i, eval_fn in enumerate(eval_fns):
                 stats[i] += eval_fn(
-                    denormalize(outputs, dtype=torch.float),
-                    denormalize(targets, dtype=torch.float),
+                    denormalize(outputs).float(),
+                    denormalize(targets).float(),
                 )
 
             n += 1
@@ -118,9 +121,11 @@ def at_epoch(
     eval_dataLoader: DataLoader,
     loss_fn: Callable,
     eval_fn: Union[Callable, List[Callable]],
+    denormalize,
     optimizer: Optimizer,
     scaler,
     gradient_clipping: float,
+    scheduler: Union[torch.optim.lr_scheduler._LRScheduler, None] = None,
 ):
     """
     Train a model. Epochs could be the number of epochs to train, or a tuple with `start` and `end`
@@ -143,12 +148,14 @@ def at_epoch(
             optimizer,
             scaler,
             gradient_clipping,
+            scheduler,
         )
 
         eval_v = model_eval(
             model,
             eval_dataLoader,
             eval_fn,
+            denormalize,
         )
 
         yield epoch + 1, (step_v, eval_v)

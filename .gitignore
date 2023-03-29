@@ -178,3 +178,5 @@ nohup.out
 
 # TensorBoard
 runs/
+.DS_Store
+*.tif
