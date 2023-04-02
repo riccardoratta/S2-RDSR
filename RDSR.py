@@ -15,6 +15,14 @@ from helpers.dataset import norm_SR20, norm_SR60
 from helpers.splitter import to_batch, to_image
 from helpers.dataset import normalize_t, denormalize_t
 
+
+def size_parser(value: str):
+    tokens = value.split(",")
+    if len(tokens) == 1:
+        return int(tokens[0])
+    return int(tokens[0]), int(tokens[1])
+
+
 parser = argparse.ArgumentParser(
     description="Use the RDSR deep neural network",
 )
@@ -39,8 +47,8 @@ parser.add_argument(
 
 parser.add_argument(
     "--size",
-    type=int,
-    help="Size of the patch to SR",
+    type=size_parser,
+    help="Size of the patch to SR. Specify a single value for having a square patch or two values for different height and width",
 )
 
 parser.add_argument(
@@ -77,9 +85,14 @@ if __name__ == "__main__":
     )
     d_norm_t_360m = denormalize_t(norm_SR60, "360")
 
-    size_10m = args.size
-    size_20m = args.size // 2
-    size_60m = args.size // 6
+    if isinstance(args.size, tuple):
+        size_10m_h, size_10m_w = args.size
+        size_20m_h, size_20m_w = args.size[0] // 2, args.size[1] // 2
+        size_60m_h, size_60m_w = args.size[0] // 6, args.size[1] // 6
+    else:
+        size_10m_h, size_10m_w = args.size, args.size
+        size_20m_h, size_20m_w = args.size // 2, args.size // 2
+        size_60m_h, size_60m_w = args.size // 6, args.size // 6
 
     image = None
 
@@ -98,7 +111,7 @@ if __name__ == "__main__":
 
     x, y = args.x, args.y
 
-    window = Window(x // 1, y // 1, size_10m, size_10m)  # type: ignore
+    window = Window(x // 1, y // 1, size_10m_w, size_10m_h)  # type: ignore
 
     p_10m = torch.tensor(
         img_10m.read(
@@ -110,14 +123,14 @@ if __name__ == "__main__":
     p_20m = torch.tensor(
         img_20m.read(
             (1, 2, 3, 4, 5, 6),
-            window=Window(x // 2, y // 2, size_20m, size_20m),  # type: ignore
+            window=Window(x // 2, y // 2, size_20m_w, size_20m_h),  # type: ignore
             out_dtype="int16",
         )
     )
     p_60m = torch.tensor(
         img_60m.read(
             (1, 2),
-            window=Window(x // 6, y // 6, size_60m, size_60m),  # type: ignore
+            window=Window(x // 6, y // 6, size_60m_w, size_60m_h),  # type: ignore
             out_dtype="int16",
         )
     )
