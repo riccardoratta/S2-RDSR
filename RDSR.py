@@ -205,7 +205,7 @@ if __name__ == "__main__":
             "w",
             driver="GTiff",
             height=p_10m.shape[1],
-            width=p_20m.shape[2],
+            width=p_10m.shape[2],
             count=12,
             dtype="uint16",
             crs=crs,
