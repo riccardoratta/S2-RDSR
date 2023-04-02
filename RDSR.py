@@ -1,7 +1,6 @@
 import os.path as p
 import argparse
 from time import time
-import json
 
 import rasterio
 import torch
