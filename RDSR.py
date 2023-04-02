@@ -50,6 +50,8 @@ parser.add_argument(
     help="Batch size for inference",
 )
 
+PATCH_SIZE = 120
+
 if __name__ == "__main__":
     args = parser.parse_args()
 
@@ -86,10 +88,12 @@ if __name__ == "__main__":
 
         x, y = args.x, args.y
 
+        window = Window(x // 1, y // 1, size_10m, size_10m)  # type: ignore
+
         p_10m = torch.tensor(
             img_10m.read(
                 (1, 2, 3, 4),
-                window=Window(x // 1, y // 1, size_10m, size_10m),  # type: ignore
+                window=window,
                 out_dtype="int16",
             )
         )
@@ -108,12 +112,15 @@ if __name__ == "__main__":
             )
         )
 
+        # save for georeferencing
+        crs = img_10m.profile["crs"]
+        transform = img_10m.window_transform(window)
+
         img_10m.close()
         img_20m.close()
         img_60m.close()
 
-        border = 2
-        patch_size = 120
+        border = 6
 
         print("Super-resolving 20 meters..", end=" ", flush=True)
 
@@ -130,8 +137,8 @@ if __name__ == "__main__":
         # apply model on patch at 10 and 20 meters
         ys = []
         for x_10m, x_20m in zip(
-            to_batch(p_10m, patch_size // 1, border // 1, args.batch_size),
-            to_batch(p_20m, patch_size // 2, border // 2, args.batch_size),
+            to_batch(p_10m, PATCH_SIZE // 1, border // 1, args.batch_size),
+            to_batch(p_20m, PATCH_SIZE // 2, border // 2, args.batch_size),
         ):
             with torch.no_grad():
                 ys.append(
@@ -158,16 +165,16 @@ if __name__ == "__main__":
 
         model_SR60.eval()
 
-        border = 6
+        border = 12
 
         start = time()
 
         # apply model on patch at 10, 20 and 60 meters
         ys = []
         for x_060m, x_120m, x_360m in zip(
-            to_batch(p_10m, patch_size // 1, border // 1, 5),
-            to_batch(p_20m, patch_size // 2, border // 2, 5),
-            to_batch(p_60m, patch_size // 6, border // 6, 5),
+            to_batch(p_10m, PATCH_SIZE // 1, border // 1, 5),
+            to_batch(p_20m, PATCH_SIZE // 2, border // 2, 5),
+            to_batch(p_60m, PATCH_SIZE // 6, border // 6, 5),
         ):
             with torch.no_grad():
                 ys.append(
@@ -190,7 +197,7 @@ if __name__ == "__main__":
             [p_60m.shape[0], p_10m.shape[1], p_10m.shape[2]],
         )
 
-        name = f"{p.basename(args.path)}-{args.x}_{args.y}_{args.size}"
+        name = f"{p.splitext(p.basename(args.path))[0]}-{args.x}_{args.y}_{args.size}"
 
         # save output
         with rasterio.open(
@@ -201,6 +208,8 @@ if __name__ == "__main__":
             width=p_20m.shape[2],
             count=12,
             dtype="uint16",
+            crs=crs,
+            transform=transform,
         ) as dataset:
             dataset.write(y_60m[0], 1)
             dataset.write(p_10m[0], 2)
