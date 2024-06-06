@@ -1,6 +1,5 @@
 import os.path as p
 import glob
-import json
 
 import torch
 import torchvision.transforms as T
