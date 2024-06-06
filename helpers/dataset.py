@@ -8,8 +8,6 @@ from torch.utils.data import Dataset
 
 from typing import Union, Dict, List
 
-from helpers.log import error
-
 
 def _t(t):
     return torch.tensor(t)
