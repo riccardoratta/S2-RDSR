@@ -85,15 +85,6 @@ if __name__ == "__main__":
     )
     d_norm_t_360m = denormalize_t(norm_SR60, "360")
 
-    if isinstance(args.size, tuple):
-        size_10m_h, size_10m_w = args.size
-        size_20m_h, size_20m_w = args.size[0] // 2, args.size[1] // 2
-        size_60m_h, size_60m_w = args.size[0] // 6, args.size[1] // 6
-    else:
-        size_10m_h, size_10m_w = args.size, args.size
-        size_20m_h, size_20m_w = args.size // 2, args.size // 2
-        size_60m_h, size_60m_w = args.size // 6, args.size // 6
-
     image = None
 
     with warnings.catch_warnings():
@@ -107,9 +98,26 @@ if __name__ == "__main__":
     img_20m = rasterio.open(image.subdatasets[1])
     img_60m = rasterio.open(image.subdatasets[2])
 
+    size = args.size
+
+    if args.size is None:
+        size = img_10m.height, img_10m.width
+
+    if isinstance(size, tuple):
+        size_10m_h, size_10m_w = size
+        size_20m_h, size_20m_w = size[0] // 2, size[1] // 2
+        size_60m_h, size_60m_w = size[0] // 6, size[1] // 6
+    else:
+        size_10m_h, size_10m_w = size, size
+        size_20m_h, size_20m_w = size // 2, size // 2
+        size_60m_h, size_60m_w = size // 6, size // 6
+
     image.close()
 
-    x, y = args.x, args.y
+    x, y = 0, 0
+
+    if args.size is not None:
+        x, y = args.x, args.y
 
     window = Window(x // 1, y // 1, size_10m_w, size_10m_h)  # type: ignore
 
@@ -214,7 +222,7 @@ if __name__ == "__main__":
         [p_60m.shape[0], p_10m.shape[1], p_10m.shape[2]],
     )
 
-    name = f"{p.splitext(p.basename(args.path))[0]}-{args.x}_{args.y}_{args.size}"
+    name = f"{p.splitext(p.basename(args.path))[0]}-{args.x}_{args.y}_{size}"
 
     # save output
     with rasterio.open(
