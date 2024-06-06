@@ -53,7 +53,8 @@ def to_batch(
                 n = 0
                 buffer = []
 
-    yield torch.stack(buffer, 0)
+    if len(buffer) != 0:
+        yield torch.stack(buffer, 0)
 
 
 def to_image(
